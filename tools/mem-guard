@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# mem-guard: run one heavy video/AI job (ffmpeg, whisper, frame rendering) safely
+# on a small Linux server (written for 2 cores / 4 GB / no swap).
+#   - only one guarded job at a time (lock), fails fast if another is running
+#   - refuses to start when MemAvailable is below the cap + reserve
+#   - runs inside a systemd user scope with MemoryMax, so an overrun kills
+#     only this job (cgroup-local OOM) instead of dbus / Claude / other services
+#
+# Usage: mem-guard [--max 2200M] [--wait] -- command args...
+#   MEM_GUARD_MAX      default cap (default 2200M)
+#   MEM_GUARD_CEILING  highest cap allowed, in MB (default 2600; ~70% of RAM is a sane value)
+#   MEM_GUARD_DIR      where the lock lives (default $XDG_RUNTIME_DIR or ~/.cache)
+# Needs systemd (user scope) and flock.
+#   --wait          wait for the lock instead of failing immediately
+set -euo pipefail
+
+MAX="${MEM_GUARD_MAX:-2200M}"
+RESERVE_MB=400
+WAIT=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --max) MAX="$2"; shift 2 ;;
+    --wait) WAIT=1; shift ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+[[ $# -gt 0 ]] || { echo "usage: mem-guard [--max 2200M] [--wait] -- cmd..." >&2; exit 2; }
+
+to_mb() { local v="${1^^}"; case "$v" in *G) echo $(( ${v%G} * 1024 ));; *M) echo "${v%M}";; *) echo $(( v / 1048576 ));; esac; }
+MAX_MB=$(to_mb "$MAX")
+CEIL="${MEM_GUARD_CEILING:-2600}"
+(( MAX_MB <= CEIL )) || { echo "mem-guard: cap ${MAX} is above MEM_GUARD_CEILING (${CEIL}M)" >&2; exit 2; }
+
+DIR="${MEM_GUARD_DIR:-${XDG_RUNTIME_DIR:-$HOME/.cache}}"
+mkdir -p "$DIR"
+LOCK="$DIR/mem-guard.lock"
+exec 9>"$LOCK"
+if (( WAIT )); then flock 9; else
+  flock -n 9 || { echo "mem-guard: another heavy job is running ($(cat "$LOCK.info" 2>/dev/null)). Wait for it or use --wait." >&2; exit 75; }
+fi
+echo "pid=$$ start=$(date +%T) cmd=$*" > "$LOCK.info"
+
+AVAIL_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
+NEED_MB=$(( MAX_MB + RESERVE_MB ))
+if (( AVAIL_MB < NEED_MB )); then
+  echo "mem-guard: only ${AVAIL_MB} MB available, need ${NEED_MB} MB (cap ${MAX_MB} + reserve ${RESERVE_MB}). Free memory or lower --max." >&2
+  exit 75
+fi
+
+echo "mem-guard: cap=${MAX_MB}M avail=${AVAIL_MB}M -> $*" >&2
+set +e
+systemd-run --user --scope --quiet -p MemoryMax="${MAX_MB}M" -p MemorySwapMax=0 -- "$@"
+rc=$?
+set -e
+if (( rc == 137 )); then
+  echo "mem-guard: job was killed for exceeding ${MAX_MB}M (cgroup OOM). Reduce threads/beam/batch, or split the job." >&2
+fi
+rm -f "$LOCK.info"
+exit $rc
