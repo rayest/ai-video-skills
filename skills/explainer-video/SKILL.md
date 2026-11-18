@@ -1,6 +1,14 @@
 ---
 name: explainer-video
 description: Make a vertical explainer / review / launch short video about a topic (讲解、测评、新品介绍短视频, "XX 模型发布了，核实资料做个视频"). Verify facts against official sources, generate showcase images, write a Chinese voiceover with word timings (Doubao TTS), then render a keynote-style 1080×1920 video whose cuts land on the beat and whose pop-ins land on the spoken word, with an original score and SFX synthesized in code. Also for follow-ups on such a video (改节奏, 重新配音, 换镜头).
+metadata:
+  title: 讲解短视频
+  category: 视频创作
+  summary: 给一个话题，自己核实资料、出图、配音，渲染成卡点的竖屏讲解视频，配乐也是代码合成的。
+  tags: 竖屏, 配音, 卡点, 原创配乐
+  status: stable
+  needs: 豆包语音 API Key、图片生成 API；Python 3、ffmpeg
+  try: XX 模型发布了，核实资料做个讲解视频
 ---
 
 # Topic explainer short video

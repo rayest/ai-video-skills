@@ -1,6 +1,14 @@
 ---
 name: product-promo-from-repo
 description: Prepare a product promo / launch video (宣传片、产品介绍视频、功能演示片) for a software product whose source code is in a git repo — storylines, a shot-by-shot spec, a MiniMax voiceover (配音), an original score synthesized in code, and the product's screens redrawn in HTML from the repo's frontend and backend code. Use whenever the user wants a promo, launch film or demo video "for this app / project / repo", or gives a GitHub URL or local project and says "做个视频".
+metadata:
+  title: 代码仓库变宣传片
+  category: 视频创作
+  summary: 读代码拿到真实的功能和文案，写故事线和分镜，用 HTML 按源码重绘产品界面，配音配乐一起出。
+  tags: 宣传片, 分镜, 界面重绘, 配音
+  status: stable
+  needs: MiniMax 语音 API Key；Python 3（含 scipy）、ffmpeg
+  try: 给这个仓库做一个 40 秒的产品宣传片，要配音
 ---
 
 # Product promo from a repo
